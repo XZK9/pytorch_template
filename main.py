@@ -106,7 +106,7 @@ def train_ddp(local_rank, config):
     log_dir = 'summary/%s'%(comment)
     summarywriter = SummaryWriter(log_dir) if local_rank==0 else None
 
-    ddp_trainer = DDP_Trainer(config, model, local_rank, logger, summarywriter)
+    ddp_trainer = DDP_Trainer(config, ddp_model, local_rank, logger, summarywriter)
     ddp_trainer.fit(trainloader, validloader, print_epoch_log=True, print_step_log=True)
     dist.destroy_process_group()
 
