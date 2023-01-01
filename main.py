@@ -29,6 +29,7 @@ def get_logger(config):
     """get logger"""
     logger = logging.getLogger(__name__)
     logger.setLevel(level=logging.DEBUG)
+    logger.propagate = False
 
     # stream to console
     stream_handler = logging.StreamHandler(sys.stdout)

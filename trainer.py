@@ -95,6 +95,58 @@ class Trainer:
                             'epoch_lr':epoch_lr}
         return valid_epoch_info
 
+    def run_epoch(self, epoch, dataloader, mode='train', print_log=True):
+        """run one epoch
+        Args:
+            epoch: epoch index
+            dataloader: dataloader
+            mode: train or valid
+            print_log: print log info or not, default True
+        Return:
+            epoch info
+        """
+        if not dataloader:
+            return {'epoch': epoch, 'epoch_loss': 0, 'epoch_lr': 0}
+        
+        if mode == 'train':
+            self.model.train()
+        elif mode == 'valid':
+            self.model.eval()
+
+        epoch_loss = 0
+        epoch_lr = self.scheduler.get_last_lr()[0]
+
+        for i_step, (x, y) in enumerate(dataloader):
+            x, y = x.to(self.device), y.to(self.device)
+            pred_y = self.model(x)
+            step_loss = criterion(pred_y, y)
+            if mode == 'train':
+                self.optimizer.zero_grad()
+                step_loss.backward()
+                clip_grad_norm_(self.model.parameters(), self.config.clip_grad)
+                self.optimizer.step()
+            step_info = '%d,%d,%.4f,%.5f,%s' % (
+                epoch, i_step, step_loss.item(), epoch_lr, mode)
+            if print_log:
+                self.logger.debug(step_info)
+            epoch_loss += step_loss.item()
+        
+        epoch_loss /= len(dataloader)
+        epoch_info = {'epoch': epoch,
+                      'epoch_loss': epoch_loss,
+                      'epoch_lr': epoch_lr}
+        
+        return epoch_info
+
+    
+    def _train_epoch(self, epoch, dataloader, print_log=True):
+        return self.run_epoch(epoch, dataloader, mode='train', print_log=print_log)
+
+    
+    @torch.no_grad()
+    def _valid_epoch(self, epoch, dataloader, print_log=True):
+        return self.run_epoch(epoch, dataloader, mode='valid', print_log=print_log)
+
     def save_model(self, epoch, filepath):
         """save model
         Args:
@@ -106,7 +158,7 @@ class Trainer:
         model_state = { 'model':self.model.state_dict(),
                         'optimizer':self.optimizer.state_dict(),
                         'epoch':epoch,
-                        'config':self.config }
+                        'config':self.model.config }
 
         torch.save(model_state, filepath)
     
@@ -135,6 +187,11 @@ class Trainer:
         Return:
             no return
         """
+        # save config
+        config_path = os.path.join(
+            self.config.save_path, 'config.pt')
+        torch.save(self.config, config_path)
+
         self.logger.info('epoch,epoch_loss,lr,mode')
         for epoch in range(self.config.num_epochs):
             train_info = self._train_epoch(epoch, trainloader, print_log=print_step_log)
